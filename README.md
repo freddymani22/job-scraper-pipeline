@@ -6,6 +6,46 @@ A three-stage pipeline that scrapes LinkedIn job listings, checks their expiry, 
 
 ---
 
+## System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Cluster["Pi Cluster (50x Raspberry Pi 5)"]
+        direction TB
+        subgraph Node["Each Node"]
+            VPN["PIA VPN"]
+            S1["Stage 1: Scraper\nSelenium + Chrome"]
+            S2["Stage 2: Expiry Checker\nSelenium + Chrome"]
+            S3["Stage 3: Parser\nBeautifulSoup + spaCy"]
+        end
+        Power["WiFi Smart Power Strip\n(auto power-cycle)"]
+    end
+
+    Monitor["Monitoring Dashboard"]
+    Target["Job Listings Site"]
+    Supabase["Supabase (Self-hosted)\nPostgreSQL + REST API\nCycle Coordination"]
+    Synology["Synology NAS\nRaw HTML Storage"]
+    AI["AI APIs\nDeepSeek · OpenAI · Mistral"]
+
+    VPN -->|routes traffic| S1
+    VPN -->|routes traffic| S2
+    S1 -->|fetch job pages| Target
+    S2 -->|check job URLs| Target
+    S1 -->|save raw HTML| Synology
+    S1 -->|write metadata| Supabase
+    S2 -->|mark expired jobs| Supabase
+    S3 -->|read raw HTML| Synology
+    S3 -->|call for structured data| AI
+    S3 -->|upsert parsed jobs| Supabase
+    Supabase -->|cycle flag / next batch| S1
+    Supabase -->|unprocessed jobs| S2
+    Supabase -->|unparsed jobs| S3
+    Monitor -->|watch node health| Cluster
+    Power -->|reboot failed nodes| Cluster
+```
+
+---
+
 ## Pipeline Overview
 
 ```
